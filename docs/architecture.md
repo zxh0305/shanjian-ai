@@ -1,67 +1,74 @@
 # 闪剪 AI · 分层架构说明
 
-> 面向维护者的架构速览。目录规范与开发路线见 `plans/2026-09-项目重组与开发方案.md`。
+> 面向维护者的架构速览，与代码同步维护（2026-09-18 随智能体架构升级 P1–P3 + 模型网关更新）。
+> 演进方案与阶段记录见 `plans/`（不入库）；目录规范见 `plans/2026-09-项目重组与开发方案.md`。
 
 ## 总体形态
 
 局域网个人服务：Mac 常驻 FastAPI（`server/`），手机/电脑浏览器访问 H5（`web/`），
-FFmpeg 负责重活（代理、渲染），大模型负责决策（分析/剪辑方案/文案/审查）。
+FFmpeg 负责重活（代理、渲染），大模型负责决策（分析/剪辑方案/文案/审查），
+智能体层负责编排（剪辑总监固定流水线 + 审查迭代环）。
 
-## 前端层（web/）
+## 七层结构（server/app/）
 
-- 单页应用，无框架。`index.html` 骨架 + `app.css` 样式 + `app.js` 逻辑；
-- hash 路由：`#/`(首页) `#/project/{id}`(素材) `#/analyze/{id}`(分析与配乐)
-  `#/preview/{id}[/{v}]` `#/editor/{id}`(暗色) `#/export/{id}/{v}` `#/works[/{pid}]`(作品文件夹)
-  `#/me` `#/settings` `#/login`；
-- 关键状态：`anState`（分析页）、`tlState`（编辑器）、`_cutSel`（素材勾选跨页共享）、
-  `_backCtx`（返回上下文：从哪进回哪去）；
-- 与服务端通过 REST + Bearer token；长任务（分析/渲染/审查/识别）用 `GET /renders/{jobId}` 轮询；
-- 版本管理：`BUILD` 常量 + 资源引用 `?v=`，改版递增即可强刷缓存。
+```
+routes(接口) → services(用例) → agents(编排) → tools(能力壳) → core(实现) → repositories(SQL) → db(连接/迁移)
+                                       ↘ prompts(提示词资产，只被 agents 读)
+层间只能向下依赖：tests/test_architecture.py 用 AST 强制，反向 import 即测试失败。
+tools 只准包装 core（纯能力层，不碰库）；agents 不 import routes/services/db（副作用经 ctx 注入回调）。
+```
 
-## 接口层（server/app/routes/）
+| 层 | 位置 | 内容 |
+|---|---|---|
+| ① 前端 | `web/` | 单页 H5（index.html + app.css + app.js），hash 路由，BUILD 版本强刷 |
+| ② 接口 | `routes/` | auth / upload / projects / timeline / pipeline / settings_api——只做校验→调 service→组装响应 |
+| ③ 服务 | `services/` | jobs（任务框架+轮询）、music_match（配乐打分）、cut_flow（字幕/配音/文案业务） |
+| ④ 智能体 | `agents/` | **base**（状态机主循环+卡死检测）、**toolcall**（react 选工具，暂未接入生产）、**runs**（AgentRun 事件持久化）、**director**（by_order 编排）、**editor_agent**（LLM 优先+硬校验+规则兜底）、**reviewer_agent**（抽帧+客观摘要→打分）；`prompts/` 每 agent 一个提示词模块 |
+| ⑤ 工具 | `tools/` | BaseTool/ToolCollection/ToolResult 三件套 + media_tools（probe_media/transcribe_audio/synth_tts），输出 OpenAI function-calling schema；`mcp/` stdio server 为 P4 待做 |
+| ⑥ 实现 | `core/` | probe/proxy/render/asr/tts/media_analysis/autocut（纯函数实现）；**llm**（提示词组装与结果解析，不碰密钥）、**gateway**（模型网关）、**llm_config**（多模型注册表+按用户密钥） |
+| ⑦ 数据 | `repositories/` + `db/` | 每表一文件（users/projects/assets/timelines/exports/analysis/usage）；db/ = connection + schema + 版本化迁移（基线钉死 0001/0002，新迁移对旧库真实执行） |
 
-| 文件 | 职责 |
-|---|---|
-| auth.py | 注册/登录/登出，`current_user`/`owned_project` 两道校验被其余路由复用 |
-| upload.py | multipart 上传 → 落盘 → 后台解析+代理 |
-| projects.py | 项目/素材/成片 CRUD（含单素材移除、单成片删除） |
-| timeline.py | EDL 快照读写（PUT 存 v{n+1}，历史可回溯） |
-| pipeline.py | 分析 / 配乐候选 / auto-cut（含 Vlog 字幕配音 + AI 审查环）/ 渲染 / 字幕文案 / TTS 音色 |
-| settings_api.py | 模型配置（**按用户隔离**，`llm_config_{uid}.json`） |
+## 模型网关（core/gateway.py）
 
-## 服务层（server/app/services/）
+智能体/业务只喊任务名，不认识供应商与密钥：
 
-- **core/（纯函数实现层）**：probe（ffprobe 解析）、proxy（720p 代理+封面）、render（FFmpeg 渲染）、asr（whisper）、tts（say）、media_analysis（本地信号）、autocut（规则引擎）——FastAPI 与未来 MCP 共用一套实现；
-- **tools/（工具层）**：BaseTool/ToolCollection/ToolResult 三件套 + 首批工具（probe_media/transcribe_audio/synth_tts），薄壳包装 core/；
-- **services/**：jobs（任务框架）、llm_config（按用户模型配置）、music_match（配乐打分）、qwen_vl（LLM 调用）；
-- **智能**：qwen_vl（VL 场景分析 / EDL 生成 / 旁白文案 / 成片审查，统一 `_get_client(user_id)`）；
-  asr（faster-whisper 本地识别，含幻觉过滤）；tts（macOS say，19 个中文音色，语速+自动加速贴合）；
-  llm_config（多模型注册表+按用户密钥）；media_analysis（本地信号：场景切镜/情绪/BPM）；
-- **剪辑**：autocut（无 LLM 时的规则引擎兜底）、renderer（FFmpeg 命令组装：xfade 转场链、
-  drawtext 字幕烧录、三轨混音（原声/BGM/TTS）、TTS atempo 适配）；
+```
+chat("build_edl", …) / vision("review_cut", …, imgs)
+   │ 路由链：环境变量 SHANJIAN_MODEL_<TASK> > 用户任务分配(taskModels) > 当前模型 > 备用模型
+   │ 失败降级到链上下一个；429/超时等待重试；全败抛 GatewayError（不静默）
+   └ 计量：tokens/耗时/成败 → llm_usage 表 → 设置页「本月用量」
+四个任务：analyze_scenes(视觉) / build_edl(文本) / write_narration(文本) / review_cut(视觉)
+```
 
+配置按用户隔离（`llm_config_{uid}.json`）：模型+密钥+任务分配+备用模型，设置页三段式管理。
+
+## 成片主流程（auto-cut，全程智能体驱动）
+
+```
+POST /projects/{id}/auto-cut
+ ├─ EditorAgent 同步出首版 EDL（LLM→硬校验层→规则引擎兜底）→ 存快照 v{n}
+ └─ DirectorAgent(by_order) 接管后台任务（AgentRun 驱动轮询进度）
+     [edit] → [subs] Vlog字幕/配音(ASR 原话 或 LLM 文案, 文案自动开 TTS)
+            → [render] FFmpeg（xfade 转场/字幕烧录/三轨混音/TTS atempo 贴合）
+            → [review] ReviewerAgent 抽帧打分(<80 带意见回 edit 重剪, ≤3 轮)
+     结论写 edl.meta.review → 预览页「AI 自检报告」卡
+```
+
+无 LLM 密钥时优雅降级：规则引擎剪辑、ASR 字幕、跳过审查。react 自主编排（ToolCallAgent）
+已建成未接入，对应「工具化自主编排」演进项；P4 将以 MCP stdio server 对外暴露 tools/。
 
 ## 数据层
 
-- SQLite 八表：projects / assets / analysis_reports / timelines / exports / music_library / users / auth_tokens；
-- 代码分层：`routes > services > tools > core > repositories > db`（tests/test_architecture.py 强制，反向依赖即测试失败）；
+- SQLite 九表：projects / assets / analysis_reports / timelines / exports / music_library /
+  users / auth_tokens / llm_usage（调用计量）；
 - `data/` 四目录：assets（原片）/ proxies（代理缩略）/ renders（成片）/ music（曲库）；
 - **EDL 是唯一数据源**：自动成片生成它 → 编辑器改它 → 渲染消费它；字段规格见 `docs/EDL-spec.md`；
-- 模型配置不入库（`llm_config_{uid}.json`，旧全局文件已自动迁移给首个账号）。
-
-## AI 管线（auto-cut 内部）
-
-```
-LLM/规则引擎 出 EDL ──► Vlog: 字幕(ASR 原话 或 LLM 风格文案, 无语音时文案兜底)
-                    ──► TTS 开关(仅文案旁白自动开; 原声 auto 档联动)
-                    ──► 渲染(抽帧审查: 评分<80 → 意见回灌重剪, ≤3 轮)
-                    ──► 结论写 edl.meta.review, 预览页出报告卡
-```
-
-无 LLM 密钥时全部优雅降级：规则引擎剪辑、ASR 字幕、跳过审查。
+- 密钥与模型配置不入库（`llm_config_{uid}.json`）。
 
 ## 已知约束
 
-- jobs 内存态：服务重启丢任务状态（前端会轮询到 404）；
-- `/media/*` 静态流无鉴权（局域网信任模型）；
-- 审查环最多 3 轮、TTS 加速上限 1.35x、窗口过短自动跳过该条配音。
+- jobs 内存态：服务重启丢任务状态（前端会轮询到 404）——P0 加固项；
+- `/media/*` 静态流无鉴权（局域网信任模型）——对外暴露前必须补签名 URL；
+- 审查环最多 3 轮、TTS 加速上限 1.35x、窗口过短自动跳过该条配音（防截断）；
+- 安卓端（`app-android/`）二期挂起：仓库不含签名密钥与 APK，
+  构建需在 `local.properties` 配 `shanjian.storePassword/keyPassword`。

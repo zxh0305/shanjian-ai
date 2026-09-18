@@ -1,3 +1,12 @@
+import java.util.Properties
+
+// 签名密钥与密码只在未跟踪的 local.properties（shanjian.storePassword / shanjian.keyPassword），
+// 仓库里不出现明文；缺配置时跳过 release 签名（debug 包不受影响）。
+val localProps = Properties().apply {
+    val f = rootDir.resolve("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -26,9 +35,9 @@ android {
         }
         create("release") {
             storeFile = file("../release.keystore")
-            storePassword = "shanjian123"
+            storePassword = localProps.getProperty("shanjian.storePassword") ?: ""
             keyAlias = "shanjian-release"
-            keyPassword = "shanjian123"
+            keyPassword = localProps.getProperty("shanjian.keyPassword") ?: ""
             enableV1Signing = true
             enableV2Signing = true
         }
@@ -36,7 +45,9 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            // 没配签名（local.properties 无密码）就退回 debug 签名，保证 assembleRelease 不中断
+            signingConfig = if (localProps.getProperty("shanjian.storePassword") != null)
+                signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }
     compileOptions {

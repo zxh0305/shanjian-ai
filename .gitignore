@@ -29,3 +29,7 @@ docs/node_modules/
 *.log
 .idea/
 .vscode/
+
+# 安卓签名密钥
+*.keystore
+*.jks

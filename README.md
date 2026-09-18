@@ -12,19 +12,22 @@
 ```
 shanjian-ai/
 ├── web/                # ★ 前端层：手机 H5 单页应用（index.html + app.css + app.js）
-├── docs/               # 规格与架构文档（EDL-spec / architecture）；plans/ 为开发方案（git 忽略）
+├── docs/               # 规格与架构文档（EDL-spec / architecture / deployment）；plans/ 为开发方案（git 忽略）
 ├── server/             # ★ 服务层（FastAPI）
 │   ├── app/
 │   │   ├── main.py     # 入口：路由挂载 + web/ 托管 + /media 静态流
 │   │   ├── config.py   # 路径/限制/ffmpeg 路径
-│   │   ├── db.py       # SQLite 八表 + 迁移
-│   │   ├── routes/     # 接口层：auth / upload / projects / timeline / pipeline / settings
-│   │   ├── schemas/    # EDL pydantic 模型（全局唯一数据源契约）
-│   │   └── services/   # 服务层：媒体(probe/proxy) 智能(qwen_vl/asr/tts) 剪辑(autocut/renderer) 支撑(jobs/db/music)
+│   │   ├── routes/     # ② 接口层：auth / upload / projects / timeline / pipeline / settings_api
+│   │   ├── services/   # ③ 服务层：jobs(任务) / music_match / cut_flow(字幕配音文案)
+│   │   ├── agents/     # ④ 智能体层：base(状态机) director(编排) editor/reviewer + runs/ + prompts/
+│   │   ├── tools/      # ⑤ 工具层：BaseTool 三件套 + media_tools（MCP 薄壳 P4 待做）
+│   │   ├── core/       # ⑥ 实现层：probe/proxy/render/asr/tts/autocut + llm + gateway(模型网关) + llm_config
+│   │   ├── repositories/ + db/  # ⑦ 每表一文件 SQL / 连接+schema+版本化迁移
+│   │   └── schemas/    # EDL pydantic 模型（全局唯一数据源契约）
 │   ├── data/           # 运行时数据（git 忽略）
-│   ├── scripts/ tests/ # e2e 自测 / 冒烟测试
+│   ├── scripts/ tests/ # e2e 自测 / 单测与架构契约（27 例）
 │   └── requirements.txt · start.sh
-└── app-android/        # 手机原生端（二期占位）
+└── app-android/        # 手机原生端（二期挂起；签名密钥不入库）
 ```
 
 分层与数据流详见 `docs/architecture.md`；目录规范与开发路线见 `docs/plans/`；
@@ -70,16 +73,13 @@ cd server && .venv/bin/pytest tests/ -v
 | W1–W2 服务端骨架：FastAPI + 上传 + ffprobe + 720p 代理 + EDL schema + SQLite 六表 | ✅ |
 | W3–W5 AI 分析 / 音乐库匹配 / 自动剪辑规则引擎（ffmpeg 统计 + numpy 轻量实现） | ✅ MVP 版 |
 | W6–W7 FFmpeg 渲染（xfade 四种转场 / 淡入淡出 / 三档画幅分辨率 / v{n} 不覆盖） | ✅ |
-| W8–W10 Android App（Compose 三页：导入 / 分析 / 预览导出） | ✅ APK 已出 |
+| W8–W10 Android App（Compose 三页：导入 / 分析 / 预览导出） | ✅ 已出包，现挂起二期 |
 | W9–W10 端侧兜底导出（Media3 Transformer）、轻编辑器、mDNS | ⬜ 二期 |
 | 多用户登录隔离 + Vlog 口播自动字幕（faster-whisper 本地 ASR + drawtext 烧录） | ✅ |
 | 端到端验证：`server/.venv/bin/python scripts/e2e.py`（合成素材跑通全链路） | ✅ 通过 |
 
 ## 安装 App（手机）
 
-1. 电脑执行 `server/start.sh` 启动服务端；把音乐文件放进 `server/data/music/`。
-2. 把 `闪剪AI-debug.apk` 传到手机安装（AirDrop / 微信传文件都行）。
-3. 打开 App，首页填电脑的局域网地址（如 `http://192.168.1.5:8600`）→ 点「连接」。
-4. 相册选几段视频 → AI 分析 → 挑配乐 → 开始智能成片 → 预览/存相册/分享。
-
-注意：系统可能提示「未知来源应用」，允许安装即可（debug 签名，仅自用）。
+安卓 App 二期挂起，仓库不再附带安装包（签名密钥与 APK 均不入库）。现阶段直接用手机浏览器
+访问服务端即可（就是本项目的 Web 界面）。二期恢复构建时：在 `app-android/local.properties`
+配置 `shanjian.storePassword / shanjian.keyPassword` 后执行 `./gradlew assembleRelease`。
