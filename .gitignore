@@ -1,0 +1,31 @@
+# 闪剪 AI · 根目录 .gitignore
+
+# ---- Python / 服务端 ----
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# 运行时数据（用户素材/成片/库/密钥，绝不入库）
+server/data/
+
+# ---- 前端 ----
+node_modules/
+
+# ---- Android ----
+app-android/app/build/
+app-android/.gradle/
+app-android/build/
+app-android/local.properties
+*.apk
+
+# ---- 文档：规格进 git，开发方案/复盘不进 ----
+docs/plans/
+docs/node_modules/
+
+# ---- 系统/编辑器 ----
+.DS_Store
+*.log
+.idea/
+.vscode/

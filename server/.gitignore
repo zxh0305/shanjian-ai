@@ -1,0 +1,9 @@
+# 服务端 git 忽略（仓库根在 server/，读不到上层 .gitignore）
+
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 运行时数据（用户素材/成片/库/密钥，绝不入库）
+data/
