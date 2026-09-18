@@ -196,6 +196,18 @@ def build_command(edl: EDL, assets: dict[int, dict], music_path: str | None,
             m += f",afade=t=in:st=0:d={edl.audio.fadeInMs / 1000:.2f}"
         if edl.audio.fadeOutMs:
             m += f",afade=t=out:st={max(total_s - edl.audio.fadeOutMs / 1000, 0):.3f}:d={edl.audio.fadeOutMs / 1000:.2f}"
+        # Ducking：每条配音窗口把配乐压到约三成，0.2s 缓入 / 0.3s 缓出（音量包络串联）
+        if getattr(edl.audio, "ducking", True) and tts_tracks:
+            duck = max(round(edl.audio.volume * 0.3, 2), 0.1)
+            for _a, t_start, t_end, _t in tts_tracks:
+                s, e = max(t_start / 1000, 0), min(t_end / 1000, total_s)
+                if e - s < 0.3:
+                    continue
+                pre = min(0.2, s)
+                m += (f",volume=volume='if(lt(t,{s - pre:.2f}),1,"
+                      f"if(lt(t,{s:.2f}),{duck}+(1-{duck})*(t-{s - pre:.2f})/{pre:.2f},"
+                      f"if(lt(t,{e:.2f}),{duck},"
+                      f"if(lt(t,{e + 0.3:.2f}),{duck}+(1-{duck})*(t-{e:.2f})/0.3,1))))':eval=frame")
         m += f",volume={edl.audio.volume},atrim=end={total_s:.3f},asetpts=PTS-STARTPTS[mus]"
         parts.append(m)
         labels.append("[mus]")

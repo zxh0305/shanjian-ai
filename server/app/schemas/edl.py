@@ -47,6 +47,7 @@ class Audio(BaseModel):
     ttsEnabled: bool = Field(default=False, description="字幕配音：渲染时把字幕朗读出来（macOS say）")
     ttsVoice: str = Field(default="", description="配音音色（macOS say 语音名，空=自动选默认中文音色）")
     ttsRate: float = Field(default=1.0, ge=0.6, le=1.6, description="配音语速倍率，1.0=正常")
+    ducking: bool = Field(default=True, description="有配音时自动压低配乐（缓入缓出到约三成）")
 
 
 class Caption(BaseModel):

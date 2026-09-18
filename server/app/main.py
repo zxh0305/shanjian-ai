@@ -24,6 +24,8 @@ async def lifespan(_: FastAPI):
     import logging
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     db.init_db()
+    from .services import jobs
+    jobs.mark_interrupted_on_startup()
     try:
         require_ffmpeg()
     except RuntimeError as e:

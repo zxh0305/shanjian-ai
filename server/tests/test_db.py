@@ -41,8 +41,8 @@ def test_old_db_baseline_still_runs_new_migrations(tmp_path, monkeypatch):
         applied = {r["version"] for r in c.execute("SELECT version FROM _migrations")}
         tables = {r["name"] for r in c.execute(
             "SELECT name FROM sqlite_master WHERE type='table'")}
-    assert applied == {"0001", "0002", "0003"}
-    assert "llm_usage" in tables
+    assert applied == {"0001", "0002", "0003", "0004"}
+    assert "llm_usage" in tables and "jobs" in tables
 
 
 def test_poisoned_marker_self_heals(tmp_path, monkeypatch):
@@ -75,8 +75,8 @@ def test_fresh_db_all_migrations(tmp_path, monkeypatch):
         applied = {r["version"] for r in c.execute("SELECT version FROM _migrations")}
         tables = {r["name"] for r in c.execute(
             "SELECT name FROM sqlite_master WHERE type='table'")}
-    assert applied == {"0001", "0002", "0003"}
-    assert {"projects", "users", "llm_usage"} <= tables
+    assert applied == {"0001", "0002", "0003", "0004"}
+    assert {"projects", "users", "llm_usage", "jobs"} <= tables
 
 
 def test_init_db_idempotent(tmp_path, monkeypatch):
@@ -87,4 +87,4 @@ def test_init_db_idempotent(tmp_path, monkeypatch):
     migrate.init_db()
     with _db(db) as c:
         n = c.execute("SELECT COUNT(*) AS n FROM _migrations").fetchone()["n"]
-    assert n == 3
+    assert n == 4

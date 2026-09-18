@@ -1,5 +1,5 @@
 const API = '';
-const BUILD = 'v20260918-8';   // 页面构建标识（每页左上角徽章 + 「我的」页可见）
+const BUILD = 'v20260918-9';   // 页面构建标识（每页左上角徽章 + 「我的」页可见）
 let pollTimers = {};
 
 const $ = (s, p = document) => p.querySelector(s);
@@ -1533,6 +1533,11 @@ function renderEditor() {
         <span class="knob" style="left:${(((au.ttsRate ?? 1) - 0.7) / 0.8 * 100).toFixed(0)}%"></span>
       </div>
       <div class="vol-marks"><span>0.7x 慢</span><span>1.0x</span><span>1.5x 快</span></div>
+      <div class="vol-head" style="margin-top:11px">
+        <span>配音时压低配乐</span>
+        <button class="toggle ${au.ducking === false ? 'off' : ''}" title="显式开关 ducking" onclick="tlToggleDucking()"></button>
+      </div>
+      <div style="font-size:10.5px;color:var(--t3);margin:2px 0 2px">朗读字幕时配乐自动降到约三成并缓入缓出，人声更清楚</div>
     </div>
     <div class="alt-title">换成这几首也不错</div>
     ${tlState.musicList.filter(m => m.musicId !== au.musicId).map((m, idx) => `
@@ -1579,6 +1584,12 @@ function renderEditor() {
   subs.sort((a, b) => a.cp.startMs - b.cp.startMs);
 
   html += `<div class="alt-title">字幕 ${subs.length} 条 · 点条目编辑${subs.length ? '，保存并渲染后烧进画面' : '，或点上方「AI 识别字幕」自动生成'}</div>`;
+  if (subs.length) {
+    const total = tlTotalMs();
+    html += `<div class="cap-lane" id="capLane"></div>
+      <div class="cap-scale"><span>00:00</span><span>${fmtDur2(Math.round(total / 2))}</span><span>${fmtDur2(total)}</span></div>
+      <div style="font-size:10px;color:var(--t3);margin:0 0 12px">左右拖动字幕条调整出现时间 · 拖两端调长短 · 点按改文字</div>`;
+  }
   html += subs.map(({ cp, ci }) => `
     <div class="sub-row" onclick="edEditSubtitle(${ci})">
       <span class="sub-time">${fmtDur2(cp.startMs)}–${fmtDur2(cp.endMs)}</span>
@@ -1615,6 +1626,7 @@ function renderEditor() {
 
   bindEditorPreview();
   bindTrimBar();
+  bindCapTrack();
   bindVolSlider('volMusic', v => { tlState.edl.audio.volume = v; $('#volMusicVal').textContent = Math.round(v*100)+'%'; markDirty(); });
   bindVolSlider('volOrig', v => { tlState.edl.audio.originalVolume = v; tlState.edl.audio.keepOriginal = v > 0; $('#volOrigVal').textContent = Math.round(v*100)+'%'; markDirty(); });
   ensureTtsVoices();
@@ -1686,6 +1698,60 @@ function bindEditorPreview() {
     v.currentTime = inS + ratio * (durMs / 1000);
     upd();
   };
+}
+
+// ===== 字幕时间轴（拖拽微调） =====
+function bindCapTrack() {
+  const lane = $('#capLane'); if (!lane || !tlState) return;
+  const total = Math.max(tlTotalMs(), 1);
+  const e = tlState.edl;
+  const items = e.captions.map((cp, ci) => ({ cp, ci })).filter(x => x.cp.style === 'subtitle');
+  // 百分比定位：面板未激活（display:none）时没有宽度也能正确布局
+  lane.innerHTML = items.map(({ cp, ci }) => `
+    <div class="cap-chip" data-ci="${ci}"
+         style="left:${(cp.startMs / total * 100).toFixed(2)}%;width:${(((cp.endMs - cp.startMs) / total * 100) || 1.5).toFixed(2)}%">
+      <span class="h" data-m="l"></span><span class="cap-chip-txt">${esc(cp.text)}</span><span class="h" data-m="r"></span>
+    </div>`).join('');
+
+  let drag = null;   // { chip, cap, mode, x0, s0, e0, moved, pxms }
+  lane.addEventListener('pointerdown', ev => {
+    const chip = ev.target.closest('.cap-chip'); if (!chip) return;
+    const cap = e.captions[+chip.dataset.ci]; if (!cap) return;
+    drag = { chip, cap, mode: ev.target.dataset.m === 'l' ? 'l' : ev.target.dataset.m === 'r' ? 'r' : 'm',
+             x0: ev.clientX, s0: cap.startMs, e0: cap.endMs, moved: false,
+             pxms: lane.clientWidth / total };   // 交互瞬间面板必然可见，此时宽度可信
+    drag.chip.setPointerCapture(ev.pointerId);
+    ev.preventDefault();
+  });
+  lane.addEventListener('pointermove', ev => {
+    if (!drag) return;
+    const dms = (ev.clientX - drag.x0) / drag.pxms;
+    if (Math.abs(ev.clientX - drag.x0) > 4) drag.moved = true;
+    const minLen = 300;
+    if (drag.mode === 'm') {
+      const len = drag.e0 - drag.s0;
+      const s = Math.max(0, Math.min(drag.s0 + dms, total - len));
+      drag.cap.startMs = Math.round(s / 100) * 100;
+      drag.cap.endMs = drag.cap.startMs + len;
+    } else if (drag.mode === 'l') {
+      drag.cap.startMs = Math.round(Math.max(0, Math.min(drag.s0 + dms, drag.e0 - minLen)) / 100) * 100;
+    } else {
+      drag.cap.endMs = Math.round(Math.max(Math.min(total, drag.e0 + dms), drag.cap.startMs + minLen) / 100) * 100;
+    }
+    drag.chip.style.left = (drag.cap.startMs / total * 100).toFixed(2) + '%';
+    drag.chip.style.width = (((drag.cap.endMs - drag.cap.startMs) / total * 100) || 1.5).toFixed(2) + '%';
+  });
+  const finish = () => {
+    if (!drag) return;
+    const wasTap = !drag.moved && drag.mode === 'm';
+    const ci = +drag.chip.dataset.ci;
+    drag.chip.classList.remove('drag'); drag = null;
+    if (wasTap) { edEditSubtitle(ci); return; }
+    markDirty();
+    renderEditor();   // 拖拽已结束，整页刷新同步列表时间
+  };
+  lane.addEventListener('pointerup', finish);
+  lane.addEventListener('pointercancel', () => { if (drag) { drag.chip.classList.remove('drag'); drag = null; } });
 }
 
 // ===== 裁剪手柄 =====
@@ -1886,6 +1952,10 @@ window.edGenNarration = async () => {
 };
 window.tlToggleTts = () => {
   tlState.edl.audio.ttsEnabled = !tlState.edl.audio.ttsEnabled;
+  markDirty(); renderEditor();
+};
+window.tlToggleDucking = () => {
+  tlState.edl.audio.ducking = !(tlState.edl.audio.ducking !== false);
   markDirty(); renderEditor();
 };
 window.tlSetVoice = v => { tlState.edl.audio.ttsVoice = v; markDirty(); };
@@ -2161,7 +2231,7 @@ async function goExport(pid, version = null, withNav = true) {
     if (!$('#exportBar')) {
       const bar = el('footer', 'action-bar'); bar.id = 'exportBar';
       bar.innerHTML = `
-        <a class="btn-main wide" href="${e.url}" download>${svg(I.download,16,16)}下载到相册</a>
+        <button class="btn-main wide" onclick="expSaveAlbum('${e.url}','${esc(e.fileName)}')">${svg(I.download,16,16)}保存到相册</button>
         <button class="btn-sub" onclick="goPreview(${pid}, ${e.version})">${svg(I.arrowL,16,16)}回预览</button>`;
       $('#app').appendChild(bar);
     }
@@ -2256,6 +2326,26 @@ window.shareOut = async (channel, url, name) => {
       toast(`链接已复制，粘贴到${channel}分享`);
     }
   }
+};
+
+// 相册直存：Web Share 文件方向可用（HTTPS/PWA 环境）直接调系统分享面板「存储到相册」；
+// 局域网 HTTP 下多数浏览器不支持 → 退回下载并提示手动转存
+window.expSaveAlbum = async (url, name) => {
+  try {
+    const r = await fetch(url);
+    const blob = await r.blob();
+    const file = new File([blob], name, { type: blob.type || 'video/mp4' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: name });
+      toast('已调起系统分享，选择「存储到相册」即可');
+      return;
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;   // 用户取消了分享面板
+  }
+  const a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  toast('当前环境不支持直存相册：已开始下载，在「文件」里选中视频 → 分享 → 存储到相册', true);
 };
 
 // ============================================================

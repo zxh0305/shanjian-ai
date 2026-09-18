@@ -78,8 +78,10 @@ stdio 传输适合本地个人机（已用 JSON-RPC initialize/tools/list 实测
 
 ## 已知约束
 
-- jobs 内存态：服务重启丢任务状态（前端会轮询到 404）——P0 加固项；
 - `/media/*` 静态流无鉴权（局域网信任模型）——对外暴露前必须补签名 URL；
+- 上传无断点续传（局域网场景优先级低）；
 - 审查环最多 3 轮、TTS 加速上限 1.35x、窗口过短自动跳过该条配音（防截断）；
+- ducking：EDL `audio.ducking`（默认开），配音窗口把配乐压到约三成，0.2s/0.3s 缓入缓出；
+- jobs 状态已落库（0004）：重启后轮询得到「服务重启，任务已中断」终态而非 404；
 - 安卓端（`app-android/`）二期挂起：仓库不含签名密钥与 APK，
   构建需在 `local.properties` 配 `shanjian.storePassword/keyPassword`。

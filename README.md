@@ -101,6 +101,9 @@ claude mcp add shanjian-media-render  -- /绝对路径/server/scripts/mcp_render
 | P3 智能体层（BaseAgent/Director/Editor/Reviewer + prompts 资产） | ✅ |
 | 模型网关（任务路由/降级/计量 + 设置页任务分配与用量） | ✅ |
 | P4 MCP stdio server（双领域）+ Skill 层（风格/评分/节奏资产化） | ✅ |
+| P0 加固：jobs 状态落库（重启不丢任务） | ✅ |
+| P1 体验：配乐 ducking（配音自动压低 BGM）/ 字幕时间轴拖拽 / 相册直存 | ✅ |
+| 大文件上传断点续传 | ⬜ 局域网优先级低 |
 | P5 前端 features 化（web/js/features/ 按域拆分） | ⬜ 渐进 |
 
 ## 安装 App（手机）
