@@ -12,6 +12,7 @@ import tempfile
 from pathlib import Path
 
 from ..config import settings
+from ..prompts import reviewer as reviewer_prompts
 from ..schemas.edl import EDL, TransitionType
 from ..core import llm as qwen_vl
 from .base import AgentState, BaseAgent
@@ -82,5 +83,6 @@ class ReviewerAgent(BaseAgent):
             self.result = {"error": "抽帧失败，跳过审查"}
             self.state = AgentState.FINISHED
             return
-        self.result = qwen_vl.review_cut(frames, review_summary(edl), user_id=user_id)
+        prompt = reviewer_prompts.review_prompt(review_summary(edl))
+        self.result = qwen_vl.review_cut(frames, prompt, user_id=user_id)
         self.state = AgentState.FINISHED

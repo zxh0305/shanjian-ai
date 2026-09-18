@@ -54,7 +54,11 @@ def gen_subtitles_for_edl(project_id: int, edl: EDL, job=None, p0: float = 0.0, 
             subs.append(Caption(text=g["text"], startMs=start, endMs=end, style="subtitle"))
     return subs
 
-from ..prompts.editor import NARRATION_STYLE_TEXT as NARRATION_STYLES  # noqa: E402 单源于提示词资产
+def narration_style_text(key: str) -> str:
+    """文案风格 → skills/narration-* 资产（描述+正文），未知名退回幽默。"""
+    from ..skills import loader
+    return loader.narration_style_text(key)
+
 
 def timeline_starts_ms(edl: EDL) -> list[int]:
     trans = {t.afterClip: t for t in edl.transitions}
@@ -116,7 +120,7 @@ def apply_vlog_subs(user_id: int, project_id: int, edl: EDL, sub_style: str,
         if sub_style and sub_style != "asr" and use_llm:
             subs = [Caption(text=x["text"], startMs=x["startMs"], endMs=x["endMs"], style="subtitle")
                     for x in gen_narration_subs(user_id, project_id, edl,
-                                                 NARRATION_STYLES.get(sub_style, NARRATION_STYLES["humor"]),
+                                                 narration_style_text(sub_style),
                                                  job)]
             narrated = bool(subs)
         else:
@@ -125,7 +129,7 @@ def apply_vlog_subs(user_id: int, project_id: int, edl: EDL, sub_style: str,
                 # 识别不到语音（画面无口播）→ 自动改用 AI 按画面生成文案兜底
                 subs = [Caption(text=x["text"], startMs=x["startMs"], endMs=x["endMs"], style="subtitle")
                         for x in gen_narration_subs(user_id, project_id, edl,
-                                                     NARRATION_STYLES["humor"], job)]
+                                                     narration_style_text("humor"), job)]
                 narrated = bool(subs)
         edl.captions = [c for c in edl.captions if c.style != "subtitle"] + subs
         # 配音默认只给「AI 文案/兜底旁白」开；原话字幕的原声本身就是配音

@@ -24,7 +24,8 @@ tools 只准包装 core（纯能力层，不碰库）；agents 不 import routes
 | ② 接口 | `routes/` | auth / upload / projects / timeline / pipeline / settings_api——只做校验→调 service→组装响应 |
 | ③ 服务 | `services/` | jobs（任务框架+轮询）、music_match（配乐打分）、cut_flow（字幕/配音/文案业务） |
 | ④ 智能体 | `agents/` | **base**（状态机主循环+卡死检测）、**toolcall**（react 选工具，暂未接入生产）、**runs**（AgentRun 事件持久化）、**director**（by_order 编排）、**editor_agent**（LLM 优先+硬校验+规则兜底）、**reviewer_agent**（抽帧+客观摘要→打分）；`prompts/` 每 agent 一个提示词模块 |
-| ⑤ 工具 | `tools/` | BaseTool/ToolCollection/ToolResult 三件套 + media_tools（probe_media/transcribe_audio/synth_tts），输出 OpenAI function-calling schema；`mcp/` stdio server 为 P4 待做 |
+| ⑤ 工具 | `tools/` | BaseTool/ToolCollection/ToolResult 三件套 + media_tools（probe_media/transcribe_audio/synth_tts），输出 OpenAI function-calling schema；**`mcp/` 双领域 stdio server**（media-analysis 只读 / media-render 写），Claude 等外部宿主可直连 |
+| ⑤′ 知识 | `skills/` | 流程性知识资产（SKILL.md：frontmatter 描述 + 正文），内置 narration-×4 / review-rubric / vlog-pacing；`data/skills/` 用户可覆盖新增、热加载；prompts/agents 只读不写 |
 | ⑥ 实现 | `core/` | probe/proxy/render/asr/tts/media_analysis/autocut（纯函数实现）；**llm**（提示词组装与结果解析，不碰密钥）、**gateway**（模型网关）、**llm_config**（多模型注册表+按用户密钥） |
 | ⑦ 数据 | `repositories/` + `db/` | 每表一文件（users/projects/assets/timelines/exports/analysis/usage）；db/ = connection + schema + 版本化迁移（基线钉死 0001/0002，新迁移对旧库真实执行） |
 
@@ -55,7 +56,17 @@ POST /projects/{id}/auto-cut
 ```
 
 无 LLM 密钥时优雅降级：规则引擎剪辑、ASR 字幕、跳过审查。react 自主编排（ToolCallAgent）
-已建成未接入，对应「工具化自主编排」演进项；P4 将以 MCP stdio server 对外暴露 tools/。
+已建成未接入，对应「工具化自主编排」演进项。
+
+## MCP 对外暴露（tools/mcp/）
+
+```
+claude mcp add shanjian-media-analysis -- server/scripts/mcp_analysis.sh   # probe/抽帧/转写（只读）
+claude mcp add shanjian-media-render  -- server/scripts/mcp_render.sh      # render_edl/TTS（写、长耗时）
+```
+
+一个领域一个 server、工具=原子操作、动词_宾语命名；实现全在 core/，MCP 壳零业务；
+stdio 传输适合本地个人机（已用 JSON-RPC initialize/tools/list 实测握手）。
 
 ## 数据层
 

@@ -193,9 +193,13 @@ def generate_narration(clips: list[dict], style_text: str, project_title: str = 
     """按风格为每段视频写一句旁白字幕（短视频文案）。
 
     clips: [{index, durationS, description}] → {"lines": ["...", ...]}，条数与 clips 一致。
+    style_text：风格规范全文（来自 skills/narration-*，经 cut_flow.narration_style_text 解析）。
     """
 
-    prompt = f"""你是短视频旁白文案师。为下面每一段视频写一句{style_text}风格的旁白字幕。
+    prompt = f"""你是短视频旁白文案师。按下面的风格规范，为每一段视频写一句旁白字幕。
+
+## 风格规范
+{style_text}
 
 要求：
 - 每句 8~20 个字，口语化、可直接朗读
@@ -225,20 +229,8 @@ def generate_narration(clips: list[dict], style_text: str, project_title: str = 
     return {"lines": lines}
 
 
-def review_cut(frames_b64: list[str], summary: str, user_id: int = 1) -> dict:
-    """剪辑总监自检：看成片抽帧 + 节奏/字幕摘要 → {score, pass, comment, suggestions}。"""
-    prompt_text = f"""你是严苛的短视频剪辑总监，审查下面这支成片（按时间顺序的关键帧）。
-
-审查维度：
-1. 节奏：片段长短分布是否张弛有度，有没有拖沓或过于碎片化
-2. 画面：开头是否抓人、段落衔接是否顺、结尾是否收得住
-3. 字幕/旁白：与画面内容是否匹配、语言是否自然（若有配音，考虑朗读节奏）
-
-成片数据摘要：
-{summary}
-
-要求：打分 0-100；80 分及以上且无硬伤才算通过。只输出 JSON：
-{{"score": 78, "pass": false, "comment": "一句话总评", "suggestions": ["具体可执行的改进建议", ...]}}（suggestions 最多 3 条）"""
+def review_cut(frames_b64: list[str], prompt_text: str, user_id: int = 1) -> dict:
+    """剪辑总监自检：看成片抽帧 → verdict。提示词由 prompts/reviewer（review-rubric skill）组装。"""
     try:
         out = _gw().vision("review_cut", prompt_text, frames_b64, user_id=user_id, max_tokens=2000)
         text = out["text"]

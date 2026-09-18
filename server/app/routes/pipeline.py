@@ -20,7 +20,7 @@ from ..repositories import projects as projects_repo
 from ..repositories import timelines as timelines_repo
 from ..services import jobs, music_match
 from ..services.cut_flow import (apply_vlog_subs, gen_narration_subs, gen_subtitles_for_edl,
-                                NARRATION_STYLES)
+                                 narration_style_text)
 from ..agents.director import DirectorAgent
 from ..agents.editor_agent import EditorAgent
 from ..agents.runs.run import AgentRun
@@ -341,7 +341,7 @@ def gen_narration(project_id: int, body: NarrationBody, request: Request = None)
     if not row:
         raise HTTPException(404, "还没有时间线，先自动成片或保存一次编辑")
     edl = EDL(**json.loads(row["edl"]))
-    style_text = body.custom.strip() or NARRATION_STYLES.get(body.style, NARRATION_STYLES["humor"])
+    style_text = body.custom.strip() or narration_style_text(body.style)
 
     def _fn(job, cancelled):
         subs = gen_narration_subs(user["id"], project_id, edl, style_text, job)

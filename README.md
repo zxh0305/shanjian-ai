@@ -24,12 +24,13 @@ shanjian-ai/
 │   │   ├── routes/     # ② 接口层：auth / upload / projects / timeline / pipeline / settings_api
 │   │   ├── services/   # ③ 服务层：jobs(任务) / music_match / cut_flow(字幕配音文案)
 │   │   ├── agents/     # ④ 智能体层：base(状态机) director(编排) editor/reviewer + runs/ + prompts/
-│   │   ├── tools/      # ⑤ 工具层：BaseTool 三件套 + media_tools（MCP 薄壳 P4 待做）
+│   │   ├── skills/     # 知识资产层：SKILL.md 风格/评分表/节奏规范（data/skills/ 可覆盖、热加载）
+│   │   ├── tools/      # ⑤ 工具层：BaseTool 三件套 + media_tools + mcp/(Claude 等宿主直连)
 │   │   ├── core/       # ⑥ 实现层：probe/proxy/render/asr/tts/autocut + llm + gateway(模型网关) + llm_config
 │   │   ├── repositories/ + db/  # ⑦ 每表一文件 SQL / 连接+schema+版本化迁移
 │   │   └── schemas/    # EDL pydantic 模型（全局唯一数据源契约）
 │   ├── data/           # 运行时数据（git 忽略）
-│   ├── scripts/ tests/ # e2e 自测 / 单测与架构契约（27 例）
+│   ├── scripts/ tests/ # e2e 自测 / 单测与架构契约（33 例）
 │   └── requirements.txt · start.sh
 └── app-android/        # 手机原生端（二期挂起；签名密钥不入库）
 ```
@@ -67,7 +68,14 @@ open http://localhost:8600/docs        # Swagger
 ## 运行测试
 
 ```bash
-cd server && .venv/bin/pytest tests/ -v    # 27 例：冒烟/工具/智能体/网关/迁移/架构契约
+cd server && .venv/bin/pytest tests/ -v    # 33 例：冒烟/工具/智能体/网关/迁移/Skill/MCP/架构契约
+```
+
+## MCP 接入（Claude 等外部宿主直连本机剪辑能力）
+
+```bash
+claude mcp add shanjian-media-analysis -- /绝对路径/server/scripts/mcp_analysis.sh  # 探针/抽帧/语音转写（只读）
+claude mcp add shanjian-media-render  -- /绝对路径/server/scripts/mcp_render.sh    # EDL 渲染/TTS（写、长耗时）
 ```
 
 ## 当前进度
@@ -92,7 +100,7 @@ cd server && .venv/bin/pytest tests/ -v    # 27 例：冒烟/工具/智能体/�
 | P2 工具层（core/ 纯实现 + tools/ 三件套） | ✅ |
 | P3 智能体层（BaseAgent/Director/Editor/Reviewer + prompts 资产） | ✅ |
 | 模型网关（任务路由/降级/计量 + 设置页任务分配与用量） | ✅ |
-| P4 MCP stdio server + Skill 层（风格/评分表资产化） | ⬜ 下一步 |
+| P4 MCP stdio server（双领域）+ Skill 层（风格/评分/节奏资产化） | ✅ |
 | P5 前端 features 化（web/js/features/ 按域拆分） | ⬜ 渐进 |
 
 ## 安装 App（手机）
