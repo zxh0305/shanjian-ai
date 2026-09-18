@@ -136,3 +136,17 @@ def test_pipeline_endpoints(client):
     assert r.status_code == 200 and "jobId" in r.json()
     assert client.get(f"/projects/{pid}/music").status_code == 200
     assert client.post(f"/projects/{pid}/auto-cut", json={}).status_code == 400
+
+
+def test_project_endpoint_with_exports(client):
+    """回归：项目页 exports 曾因对已映射的 DTO 再取 size_bytes（蛇形键）而 KeyError。"""
+    from app.repositories import exports as exports_repo
+    pid = client.post(
+        "/upload", files={"file": ("e.mp4", b"\x00" * 16, "video/mp4")}).json()["projectId"]
+    exports_repo.add(pid, 1, "export_test_v1.mp4", "1080x1920", 30, 12345, 999)
+
+    r = client.get(f"/projects/{pid}")
+    assert r.status_code == 200, r.text
+    exp = r.json()["exports"]
+    assert len(exp) == 1 and exp[0]["sizeBytes"] == 12345 and exp[0]["version"] == 1
+    assert client.get(f"/projects/{pid}/exports").status_code == 200

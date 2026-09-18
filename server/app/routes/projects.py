@@ -76,11 +76,7 @@ def get_project(project_id: int, request: Request):
     return {
         "projectId": p["id"], "title": p["title"], "status": p["status"], "note": p["note"],
         "currentVersion": p["current_version"], "assets": assets,
-        "exports": [
-            {"version": e["version"], "resolution": e["resolution"], "fps": e["fps"],
-             "sizeBytes": e["size_bytes"], "createdAt": e["created_at"]}
-            for e in exports
-        ],
+        "exports": exports,
         "updatedAt": p["updated_at"],
     }
 
