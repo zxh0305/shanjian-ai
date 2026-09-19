@@ -134,8 +134,13 @@ def apply_vlog_subs(user_id: int, project_id: int, edl: EDL, sub_style: str,
         edl.captions = [c for c in edl.captions if c.style != "subtitle"] + subs
         # 配音默认只给「AI 文案/兜底旁白」开；原话字幕的原声本身就是配音
         edl.audio.ttsEnabled = bool(narrated)
-        # 原声 auto：旁白配音开启时自动关掉原声，避免两个声音打架
-        if narrated and original_voice == "auto":
+        # 原声偏好统一在此落位（每轮重剪都会走这里，保证审查环/换剪法不丢设置）：
+        # off=强制关 / on=强制开 / auto=有旁白配音时自动关，避免两个声音打架
+        if original_voice == "off":
+            edl.audio.keepOriginal = False
+        elif original_voice == "on":
+            edl.audio.keepOriginal = True
+        elif narrated and original_voice == "auto":
             edl.audio.keepOriginal = False
         print(f"[字幕] Vlog 生成 {len(subs)} 条（配音{'已开启' if narrated else '关闭，原声即配音'}"
               f"{'，原声已自动关闭' if narrated and original_voice == 'auto' and edl.audio.keepOriginal is False else ''}）：", flush=True)

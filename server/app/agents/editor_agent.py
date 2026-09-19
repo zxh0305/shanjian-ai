@@ -44,7 +44,17 @@ class EditorAgent(BaseAgent):
                 self.emit(f"AI 剪辑方案失败（{str(e)[:60]}），改用本地规则引擎")
         rule_pref = {**pref, "duration": "full"} if mode == "vlog" else pref
         self.result = autocut.build_edl(ctx["title"], ctx["assets"], ctx.get("music"), rule_pref, seed=ctx.get("seed"))
+        self._apply_voice_pref(self.result, pref, mode)
         self.state = AgentState.FINISHED
+
+    def _apply_voice_pref(self, edl: EDL, pref: dict, mode: str) -> None:
+        """原声 off/on 在每次出方案时落位（重剪轮不丢）；auto 由字幕阶段按是否有配音决定。"""
+        ov = (pref or {}).get("originalVoice", "auto")
+        if ov == "off":
+            edl.audio.keepOriginal = False
+        elif ov == "on":
+            edl.audio.keepOriginal = True
+        edl.meta.preference["mode"] = mode
 
     # ---- LLM 路径（含硬校验层：明确性要求不依赖 AI 自觉） ----
     def _build_with_llm(self, ctx: dict, pref: dict, mode: str, prompt: str) -> EDL:
@@ -120,7 +130,9 @@ class EditorAgent(BaseAgent):
             Caption(text=f"{ctx['title']} · 闪剪AI", startMs=max(total_ms - 3000, 0), endMs=total_ms,
                     style="ending_credit"),
         ]
-        return EDL(meta=Meta(title=ctx["title"], aspect=aspect,
-                             preference={"duration": llm_pref["duration"],
-                                         "transitionStyle": style.value, "aspect": aspect.value}),
-                   clips=clips, transitions=transitions, audio=audio, captions=captions)
+        return self._apply_voice_pref(
+            EDL(meta=Meta(title=ctx["title"], aspect=aspect,
+                          preference={"duration": llm_pref["duration"],
+                                      "transitionStyle": style.value, "aspect": aspect.value}),
+                clips=clips, transitions=transitions, audio=audio, captions=captions),
+            pref, mode)

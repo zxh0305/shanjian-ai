@@ -79,3 +79,26 @@ def test_ducking_envelope_in_command():
     assert "volume=volume='if(" not in _build_cmd(edl, tts)
     # 无配音
     assert "volume=volume='if(" not in _build_cmd(_mk_edl(), [])
+
+
+def test_adelay_uses_milliseconds():
+    """回归：adelay 曾把秒当毫秒传 → 三条配音全叠在片头（前段吵成一团、后段全静音）。"""
+    tts = [(NS(__x="a"), 0, 2000, 1.0), (NS(__x="b"), 5000, 9000, 1.0)]
+    graph = _build_cmd(_mk_edl(), tts)
+    assert "adelay=0|0" in graph            # 第一条从 0 起
+    assert "adelay=5000|5000" in graph      # 第二条必须在 5 秒处起（毫秒）
+
+
+def test_editor_recut_keeps_original_voice_pref():
+    """回归：审查环重剪重建 EDL 后原声偏好曾丢失（v7 原声复活叠配音）。"""
+    from app.agents.editor_agent import EditorAgent
+    from app.schemas.edl import EDL as _EDL
+
+    agent = EditorAgent()
+    edl = _EDL(meta=Meta(title="t"), clips=[Clip(assetId=1, inMs=0, outMs=2000)])
+    agent._apply_voice_pref(edl, {"originalVoice": "off"}, "vlog")
+    assert edl.audio.keepOriginal is False and edl.meta.preference["mode"] == "vlog"
+    agent._apply_voice_pref(edl, {"originalVoice": "on"}, "normal")
+    assert edl.audio.keepOriginal is True and edl.meta.preference["mode"] == "normal"
+    agent._apply_voice_pref(edl, {"originalVoice": "auto"}, "vlog")
+    assert edl.audio.keepOriginal is True   # auto 不在此落位，交给字幕阶段按配音状态决定

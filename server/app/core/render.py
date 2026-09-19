@@ -196,9 +196,9 @@ def build_command(edl: EDL, assets: dict[int, dict], music_path: str | None,
             m += f",afade=t=in:st=0:d={edl.audio.fadeInMs / 1000:.2f}"
         if edl.audio.fadeOutMs:
             m += f",afade=t=out:st={max(total_s - edl.audio.fadeOutMs / 1000, 0):.3f}:d={edl.audio.fadeOutMs / 1000:.2f}"
-        # Ducking：每条配音窗口把配乐压到约三成，0.2s 缓入 / 0.3s 缓出（音量包络串联）
+        # Ducking：每条配音窗口把配乐压到约四成半，0.2s 缓入 / 0.3s 缓出（音量包络串联）
         if getattr(edl.audio, "ducking", True) and tts_tracks:
-            duck = max(round(edl.audio.volume * 0.3, 2), 0.1)
+            duck = max(round(edl.audio.volume * 0.45, 2), 0.12)
             for _a, t_start, t_end, _t in tts_tracks:
                 s, e = max(t_start / 1000, 0), min(t_end / 1000, total_s)
                 if e - s < 0.3:
@@ -213,11 +213,11 @@ def build_command(edl: EDL, assets: dict[int, dict], music_path: str | None,
         labels.append("[mus]")
 
     for k, (_aiff, t_start, t_end, tempo) in enumerate(tts_tracks):
-        ad = max(t_start, 0) / 1000
+        ad_ms = max(int(t_start), 0)   # adelay 单位是毫秒，传秒会被当个位数 → 三条配音全叠在片头
         speed = f"atempo={tempo:.3f}," if tempo and tempo > 1.01 else ""
         parts.append(
             f"[{tts_base + k}:a]aformat=sample_rates=44100:channel_layouts=stereo,"
-            f"{speed}adelay={ad:.3f}|{ad:.3f},apad,atrim=end={min(t_end / 1000 + 0.2, total_s):.3f}[tts{k}]")
+            f"{speed}adelay={ad_ms}|{ad_ms},apad,atrim=end={min(t_end / 1000 + 0.2, total_s):.3f}[tts{k}]")
         labels.append(f"[tts{k}]")
 
     if len(labels) == 1:
