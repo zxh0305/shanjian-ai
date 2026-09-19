@@ -102,3 +102,36 @@ def test_editor_recut_keeps_original_voice_pref():
     assert edl.audio.keepOriginal is True and edl.meta.preference["mode"] == "normal"
     agent._apply_voice_pref(edl, {"originalVoice": "auto"}, "vlog")
     assert edl.audio.keepOriginal is True   # auto 不在此落位，交给字幕阶段按配音状态决定
+
+
+def test_editor_llm_path_returns_edl(monkeypatch):
+    """回归：_apply_voice_pref 曾缺 return → LLM 路径'成功'交出 None（toast 空文案）。"""
+    import tempfile
+    from pathlib import Path as _P
+    os.environ.setdefault("SHANJIAN_DATA_DIR", tempfile.mkdtemp(prefix="shanjian_edllm_"))
+    from app import db as db_mod
+    import app.db.connection as conn_mod
+    from app.db import migrate
+    conn_mod.db_path = _P(os.environ["SHANJIAN_DATA_DIR"]) / "t.db"
+    migrate.init_db()
+    from app.repositories import assets as assets_repo
+    monkeypatch.setattr(assets_repo, "for_project", lambda pid: [{"id": 1}])
+    from app.core import llm as qwen_vl, llm_config
+    monkeypatch.setattr(llm_config, "get_current_model", lambda uid: {"name": "t", "llm_model": "m"})
+    monkeypatch.setattr(qwen_vl, "generate_smart_edl",
+                        lambda *a, **k: {"clips": [{"assetId": 1, "inMs": 0, "outMs": 2000, "note": "n"}],
+                                          "transitions": [], "reason": "r"})
+    from app.agents.editor_agent import EditorAgent
+    from app.schemas.edl import EDL as _EDL
+
+    ed = EditorAgent()
+    ctx = {"user_id": 1, "project_id": 1, "title": "t",
+           "assets": [{"id": 1, "file_name": "a.mp4", "duration_ms": 5000,
+                        "analysis": {"sceneSummary": {"label": "室内", "brightness": 128}, "scenes": []}}],
+           "music": None, "preference": {"duration": "full", "aspect": "9:16",
+                                          "transitionStyle": "gentle", "mode": "vlog",
+                                          "originalVoice": "off"},
+           "prompt": "", "use_llm": True, "seed": None}
+    out = ed.run(ctx)
+    assert ed.state.value == "finished"
+    assert isinstance(out, _EDL) and out.audio.keepOriginal is False   # off 落位且结果非 None

@@ -231,7 +231,7 @@ def auto_cut(project_id: int, body: AutoCutBody, request: Request = None):
     editor = EditorAgent()
     edl = editor.run(editor_ctx)
     if editor.state.value == "error" or edl is None:
-        raise HTTPException(500, f"剪辑方案生成失败：{editor.error}")
+        raise HTTPException(500, f"剪辑方案生成失败：{editor.error or '内部错误，请重试'}")
     # 模式与原声偏好落进 EDL，供「换个剪法」沿用
     edl.meta.preference = {**edl.meta.preference, "mode": mode}
     ov = body.preference.get("originalVoice", "auto")   # 原声：auto=配音开则关 / on / off

@@ -47,7 +47,7 @@ class EditorAgent(BaseAgent):
         self._apply_voice_pref(self.result, pref, mode)
         self.state = AgentState.FINISHED
 
-    def _apply_voice_pref(self, edl: EDL, pref: dict, mode: str) -> None:
+    def _apply_voice_pref(self, edl: EDL, pref: dict, mode: str) -> EDL:
         """原声 off/on 在每次出方案时落位（重剪轮不丢）；auto 由字幕阶段按是否有配音决定。"""
         ov = (pref or {}).get("originalVoice", "auto")
         if ov == "off":
@@ -55,6 +55,7 @@ class EditorAgent(BaseAgent):
         elif ov == "on":
             edl.audio.keepOriginal = True
         edl.meta.preference["mode"] = mode
+        return edl
 
     # ---- LLM 路径（含硬校验层：明确性要求不依赖 AI 自觉） ----
     def _build_with_llm(self, ctx: dict, pref: dict, mode: str, prompt: str) -> EDL:
