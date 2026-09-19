@@ -26,7 +26,7 @@ tools 只准包装 core（纯能力层，不碰库）；agents 不 import routes
 | ④ 智能体 | `agents/` | **base**（状态机主循环+卡死检测）、**toolcall**（react 选工具，暂未接入生产）、**runs**（AgentRun 事件持久化）、**director**（by_order 编排）、**editor_agent**（LLM 优先+硬校验+规则兜底）、**reviewer_agent**（抽帧+客观摘要→打分）；`prompts/` 每 agent 一个提示词模块 |
 | ⑤ 工具 | `tools/` | BaseTool/ToolCollection/ToolResult 三件套 + media_tools（probe_media/transcribe_audio/synth_tts），输出 OpenAI function-calling schema；**`mcp/` 双领域 stdio server**（media-analysis 只读 / media-render 写），Claude 等外部宿主可直连 |
 | ⑤′ 知识 | `skills/` | 流程性知识资产（SKILL.md：frontmatter 描述 + 正文），内置 narration-×4 / review-rubric / vlog-pacing；`data/skills/` 用户可覆盖新增、热加载；prompts/agents 只读不写 |
-| ⑥ 实现 | `core/` | probe/proxy/render/asr/tts/media_analysis/autocut（纯函数实现）；**llm**（提示词组装与结果解析，不碰密钥）、**gateway**（模型网关）、**llm_config**（多模型注册表+按用户密钥） |
+| ⑥ 实现 | `core/` | probe/proxy/render/asr/tts/media_analysis/autocut（纯函数实现）；tts 双引擎（edge-tts 拟人音色/say 离线兜底，SHANJIAN_TTS_ENGINE）；**llm**（提示词组装与结果解析，不碰密钥）、**gateway**（模型网关）、**llm_config**（多模型注册表+按用户密钥） |
 | ⑦ 数据 | `repositories/` + `db/` | 每表一文件（users/projects/assets/timelines/exports/analysis/usage）；db/ = connection + schema + 版本化迁移（基线钉死 0001/0002，新迁移对旧库真实执行） |
 
 ## 模型网关（core/gateway.py）

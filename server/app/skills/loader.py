@@ -68,10 +68,14 @@ def skill_text(name: str, fallback: str = "") -> str:
 
 
 def narration_style_text(key: str) -> str:
-    """文案风格解析：narration-{key} skill 的「描述 + 正文」；未知名退回幽默。"""
+    """文案风格解析：narration-{key} skill 的「描述 + 正文」，并追加口语化底线；未知名退回幽默。"""
     skills = _all_skills()
     name = f"narration-{(key or 'humor').strip().lower()}"
     if name not in skills:
         name = "narration-humor"
     desc, body = skills[name][0], skills[name][1]
-    return f"{desc}。{body}" if body else desc
+    style = f"{desc}。{body}" if body else desc
+    baseline = skills.get("narration-baseline")
+    if baseline and baseline[1]:
+        style += "\n\n" + baseline[1]
+    return style

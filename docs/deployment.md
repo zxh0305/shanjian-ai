@@ -67,8 +67,8 @@ launchctl load ~/Library/LaunchAgents/com.shanjian.ai.plist
 
 ### 形态 B：Docker（对外提供服务 / 自部署到 Linux 服务器）
 
-**前置条件（必须先做，否则容器里没有配音）**：`tts.py` 抽象 TTS 后端——
-`SHANJIAN_TTS_ENGINE=say|piper|edge-tts`。容器内用
+**前置条件已就绪（2026-09-18）**：`tts.py` 已抽象双引擎——
+`SHANJIAN_TTS_ENGINE=auto|edge|say`（auto=装了 edge-tts 就用微软神经音色，失败退 say）。容器内用
 **Piper**（离线中文神经音色，镜像内自带模型）或 **edge-tts**（微软免费在线，音质好但依赖网络）；
 macOS 宿主继续用 say。这是上 Docker 唯一的代码改动。
 
@@ -123,4 +123,4 @@ services:
 | `SHANJIAN_DATA_DIR` | 项目内 `server/data` | 数据根目录（自动创建） |
 | `FFMPEG_BIN` / `FFPROBE_BIN` | PATH/homebrew | 二进制路径 |
 | `SHANJIAN_ASR_MODEL` | `base` | whisper 模型（small 更准更慢） |
-| `SHANJIAN_TTS_ENGINE` | `say`（macOS） | 待实现：say / piper / edge-tts |
+| `SHANJIAN_TTS_ENGINE` | `auto`（装了 edge-tts 用微软神经音色，失败退 say） | edge / say（piper 未接） |

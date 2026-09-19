@@ -103,6 +103,7 @@ claude mcp add shanjian-media-render  -- /绝对路径/server/scripts/mcp_render
 | P4 MCP stdio server（双领域）+ Skill 层（风格/评分/节奏资产化） | ✅ |
 | P0 加固：jobs 状态落库（重启不丢任务） | ✅ |
 | P1 体验：配乐 ducking（配音自动压低 BGM）/ 字幕时间轴拖拽 / 相册直存 | ✅ |
+| 拟人化配音：TTS 双引擎（微软神经音色 edge-tts，离线 say 兜底）+ 文案口语化底线 | ✅ |
 | 大文件上传断点续传 | ⬜ 局域网优先级低 |
 | P5 前端 features 化（web/js/features/ 按域拆分） | ⬜ 渐进 |
 
