@@ -353,7 +353,7 @@ def gen_narration(project_id: int, body: NarrationBody, request: Request = None)
 @router.get("/tts/voices")
 def tts_voices():
     """可用中文配音音色（macOS say）。"""
-    from ..services import tts as tts_svc
+    from ..core import tts as tts_svc
     return {"voices": tts_svc.list_voices(), "default": tts_svc.default_voice()}
 
 

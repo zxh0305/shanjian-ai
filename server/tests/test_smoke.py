@@ -150,3 +150,11 @@ def test_project_endpoint_with_exports(client):
     exp = r.json()["exports"]
     assert len(exp) == 1 and exp[0]["sizeBytes"] == 12345 and exp[0]["version"] == 1
     assert client.get(f"/projects/{pid}/exports").status_code == 200
+
+
+def test_tts_voices_endpoint(client):
+    """回归：P2 迁移后 /tts/voices 仍指向 services.tts 旧位置，编辑器音频页一开就 500。"""
+    r = client.get("/tts/voices")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["voices"] and body["default"]
